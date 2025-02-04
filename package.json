@@ -10,10 +10,11 @@
     "type-check": "vue-tsc --noEmit"
   },
   "dependencies": {
+    "@types/lowdb": "^1.0.15",
     "axios": "^1.7.9",
     "leaflet": "^1.9.4",
-    "vue": "^3.5.13",
-    "leaflet-mouseposition": "^1.2.0"
+    "lowdb": "^7.0.1",
+    "vue": "^3.5.13"
   },
   "devDependencies": {
     "@types/leaflet": "^1.9.16",

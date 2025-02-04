@@ -51,3 +51,6 @@ coverage/
 # Local files
 *.local
 .history/
+
+# Database
+db.json
