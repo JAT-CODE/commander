@@ -41,6 +41,24 @@ onMounted(() => {
       attributionControl: false
     }).setView([0, 0], INITIAL_ZOOM)
 
+    // Add coordinate display
+    const CoordControl = L.Control.extend({
+      onAdd: () => {
+        const div = L.DomUtil.create('div', 'coordinate-display')
+        return div
+      }
+    })
+    const coordDisplay = new CoordControl({ position: 'topright' })
+    coordDisplay.addTo(map.value as L.Map)
+
+    // Add coordinate update on mouse move
+    map.value.on('mousemove', (e) => {
+      const div = document.querySelector('.coordinate-display')
+      if (div) {
+        div.textContent = `Coordinates: ${Math.round(e.latlng.lng * 128)} | ${Math.round(-e.latlng.lat * 128)}`
+      }
+    })
+
     // Add tile layer with loading events
     const tileLayer = L.tileLayer(`tiles/${CONTINENT_ID}/${FLOOR_ID}/{z}/{x}/{y}.jpg`, {
       tileSize: 256,
@@ -168,6 +186,8 @@ const loadApiData = async () => {
 :deep(.coordinate-display) {
   background-color: rgba(26, 26, 26, 0.8) !important;
   color: #fff !important;
+  padding: 4px 8px !important;
+  border-radius: 4px !important;
   border: none !important;
 }
 
