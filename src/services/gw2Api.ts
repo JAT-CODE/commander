@@ -1,4 +1,4 @@
-import type { Event, Map, ContinentFloor } from '../types/gw2Api'
+import type { Event, Map, ContinentFloor, GW2MapsResponse } from '../types/gw2Api'
 import axios from 'axios'
 import { db } from './db'
 
@@ -87,6 +87,29 @@ export const gw2Api = {
       return response.data
     } catch (error) {
       console.error('Error fetching map floor:', error)
+      throw error
+    }
+  },
+
+  async getMaps(): Promise<GW2MapsResponse> {
+    try {
+      // Check cache first
+      const cached = await db.getMaps()
+      if (cached && isDataFresh(cached.updatedAt)) {
+        return cached.data
+      }
+
+      // Fetch fresh data from v1 API
+      const response = await axios.get<GW2MapsResponse>(
+        `${API_BASE_URL_V1}/maps.json`
+      )
+      
+      // Cache the response
+      await db.saveMaps(response.data)
+      
+      return response.data
+    } catch (error) {
+      console.error('Error fetching maps:', error)
       throw error
     }
   }

@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { onMounted, ref } from 'vue'
+import { onMounted, ref, nextTick } from 'vue'
 import 'leaflet/dist/leaflet.css'
 import L from 'leaflet'
 import { gw2Api } from '../services/gw2Api'
@@ -7,13 +7,15 @@ import { gw2Api } from '../services/gw2Api'
 // GW2-specific constants
 const CONTINENT_ID = 1  // Tyria
 const FLOOR_ID = 1     // Main level
-const MIN_ZOOM = 0
+const MIN_ZOOM = 2
 const MAX_ZOOM = 7
-const INITIAL_ZOOM = 4
+const INITIAL_ZOOM = 3
 
 const map = ref<L.Map | null>(null)
 const isLoading = ref(true)
 const mapContainer = ref<HTMLElement | null>(null)
+
+type MapLabel = { coords: [number, number], name: string }
 
 // Convert GW2 coordinates to Leaflet coordinates
 const convertGW2Coords = (coords: [number, number] | undefined): [number, number] => {
@@ -24,34 +26,46 @@ const convertGW2Coords = (coords: [number, number] | undefined): [number, number
   return [-coords[1] / 128, coords[0] / 128]
 }
 
-onMounted(() => {
+onMounted(async () => {
   try {
     if (!mapContainer.value) {
       throw new Error('Map container not found')
     }
 
-    // Initialize map first
+    await nextTick()
+    
+    // Initialize with minimal options first
     map.value = L.map(mapContainer.value, {
-      minZoom: MIN_ZOOM,
-      maxZoom: MAX_ZOOM,
       crs: L.CRS.Simple,
-      fadeAnimation: true,
-      zoomAnimation: true,
-      preferCanvas: true,
-      attributionControl: false
-    }).setView([0, 0], INITIAL_ZOOM)
+    })
+
+    // Configure map after initialization
+    map.value.setMinZoom(MIN_ZOOM)
+    map.value.setMaxZoom(MAX_ZOOM)
+    map.value.setView([0, 0], INITIAL_ZOOM)
+
+    // Register custom control position
+    const controlCorners = (map.value as any)._controlCorners
+    const container = (map.value as any)._controlContainer
+
+    const cornerDiv = L.DomUtil.create('div', 'leaflet-coordtopright', container)
+    controlCorners['coordtopright'] = cornerDiv
 
     // Add coordinate display
     const CoordControl = L.Control.extend({
+      options: {
+        position: 'topright'
+      },
       onAdd: () => {
         const div = L.DomUtil.create('div', 'coordinate-display')
         return div
       }
     })
-    const coordDisplay = new CoordControl({ position: 'topright' })
+
+    const coordDisplay = new CoordControl()
     coordDisplay.addTo(map.value as L.Map)
 
-    // Add coordinate update on mouse move
+    // Update coordinates on mousemove
     map.value.on('mousemove', (e) => {
       const div = document.querySelector('.coordinate-display')
       if (div) {
@@ -97,22 +111,119 @@ const loadApiData = async () => {
 
     await gw2Api.init()
     const floorData = await gw2Api.getMapFloor(CONTINENT_ID, FLOOR_ID)
+    const mapsData = await gw2Api.getMaps()
     
-    if (floorData?.regions) {
-      Object.entries(floorData.regions).forEach(([regionId, region]: [string, any]) => {
-        if (region.name && region.label_coord) {
-          const [lat, lng] = convertGW2Coords(region.label_coord)
-          L.marker([lat, lng], {
+    // Calculate maximum bounds from all map coordinates
+    const bounds = Object.values(mapsData.maps)
+      .filter(map => map.type === 'Public')
+      .reduce((acc, map) => {
+        const [[x1, y1], [x2, y2]] = map.continent_rect
+        return {
+          minX: Math.min(acc.minX, x1, x2),
+          minY: Math.min(acc.minY, y1, y2),
+          maxX: Math.max(acc.maxX, x1, x2),
+          maxY: Math.max(acc.maxY, y1, y2)
+        }
+      }, { minX: Infinity, minY: Infinity, maxX: -Infinity, maxY: -Infinity })
+
+    // Convert to Leaflet bounds and set map bounds
+    const corner1 = convertGW2Coords([bounds.minX, bounds.minY])
+    const corner2 = convertGW2Coords([bounds.maxX, bounds.maxY])
+    map.value.setMaxBounds([corner1, corner2])
+
+    // Pre-calculate label data to avoid doing it on every zoom
+    const regionLabelData = Object.entries(floorData?.regions ?? {})
+      .filter(([_, region]: [string, any]) => region.name && region.label_coord)
+      .map(([_, region]: [string, any]) => ({
+        coords: convertGW2Coords(region.label_coord),
+        name: region.name
+      }))
+
+    const mapLabelData = Object.entries(floorData?.regions ?? {})
+      .flatMap(([_, region]: [string, any]) => 
+        Object.entries(region.maps ?? {})
+          .map(([mapId, _]: [string, any]) => {
+            const mapInfo = mapsData.maps[mapId]
+            if (mapInfo?.type === 'Public') {
+              const [[x1, y1], [x2, y2]] = mapInfo.continent_rect
+              return {
+                coords: convertGW2Coords([
+                  (x1 + x2) / 2,
+                  (y1 + y2) / 2
+                ]),
+                name: mapInfo.map_name
+              }
+            }
+            return null
+          })
+          .filter(Boolean)
+      )
+
+    const createLabels = () => {
+      const regionLabels = new L.LayerGroup()
+      const mapLabels = new L.LayerGroup()
+    
+      // Create region labels from pre-calculated data
+      regionLabelData.forEach(label => {
+        L.marker(label.coords, {
+          icon: L.divIcon({
+            className: 'region-label',
+            html: label.name,
+            iconSize: [0, 0],
+            iconAnchor: [0, 0]
+          }),
+          zIndexOffset: 1000,
+          interactive: false,
+          riseOnHover: false,
+          riseOffset: 0,
+        }).addTo(regionLabels)
+      })
+
+      // Create map labels from pre-calculated data
+      mapLabelData.forEach((label: MapLabel | null) => {
+        if (label) {
+          L.marker(label.coords, {
             icon: L.divIcon({
-              className: 'region-label',
-              html: region.name,
+              className: 'map-label',
+              html: label.name,
               iconSize: [0, 0],
               iconAnchor: [0, 0]
-            })
-          }).addTo(map.value as L.Map)
+            }),
+            zIndexOffset: 500,
+            interactive: false,
+            riseOnHover: false,
+            riseOffset: 0,
+          }).addTo(mapLabels)
         }
       })
+
+      // Add both layers to map initially
+      regionLabels.addTo(map.value as L.Map)
+      mapLabels.addTo(map.value as L.Map)
+
+      return { regionLabels, mapLabels }
     }
+
+    let { regionLabels, mapLabels } = createLabels()
+    
+    map.value.on('zoomstart', () => {
+      document.querySelectorAll('.region-label, .map-label').forEach(el => {
+        (el as HTMLElement).style.opacity = '0'
+      })
+    })
+
+    map.value.on('zoomend', () => {
+      const zoom = map.value?.getZoom() ?? 0
+      
+      // Just update visibility instead of recreating
+      document.querySelectorAll('.region-label').forEach(el => {
+        (el as HTMLElement).style.opacity = zoom < 4 ? '1' : '0'
+      })
+      
+      document.querySelectorAll('.map-label').forEach(el => {
+        (el as HTMLElement).style.opacity = zoom >= 4 ? '1' : '0'
+      })
+    })
 
   } catch (error) {
     console.error('Error loading API data:', error)
@@ -184,16 +295,17 @@ const loadApiData = async () => {
 }
 
 :deep(.coordinate-display) {
-  background-color: rgba(26, 26, 26, 0.8) !important;
-  color: #fff !important;
-  padding: 4px 8px !important;
-  border-radius: 4px !important;
-  border: none !important;
+  background-color: rgba(26, 26, 26, 0.8);
+  color: #fff;
+  padding: 4px 8px;
+  border-radius: 4px;
+  border: none;
 }
 
-:deep(.leaflet-control-zoom-in),
-:deep(.leaflet-control-zoom-out) {
-  border-bottom: 1px solid #333 !important;
+:deep(.region-label),
+:deep(.map-label) {
+  transition: opacity 0.6s ease-in-out, transform 0.3s ease-in-out;
+  transform-origin: center;
 }
 
 :deep(.region-label) {
@@ -224,5 +336,9 @@ const loadApiData = async () => {
     -1px 1px 0 #000,
     1px 1px 0 #000;
   white-space: nowrap;
+}
+
+:deep(.leaflet-control-attribution) {
+  display: none;
 }
 </style>

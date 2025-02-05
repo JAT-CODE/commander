@@ -1,4 +1,4 @@
-import type { ContinentFloor, Map, Event } from '../../types/gw2Api'
+import type { ContinentFloor, Map, Event, GW2MapsResponse } from '../../types/gw2Api'
 
 interface DbSchema {
   floors: {
@@ -16,6 +16,10 @@ interface DbSchema {
     data: Event[]
     updatedAt: string
   }
+  mapsData: {
+    data: GW2MapsResponse
+    updatedAt: string
+  }
 }
 
 class GW2Database {
@@ -26,7 +30,8 @@ class GW2Database {
     this.data = stored ? JSON.parse(stored) : {
       floors: [],
       maps: [],
-      events: { data: [], updatedAt: new Date().toISOString() }
+      events: { data: [], updatedAt: new Date().toISOString() },
+      mapsData: { data: { maps: {} }, updatedAt: new Date().toISOString() }
     }
   }
 
@@ -93,6 +98,18 @@ class GW2Database {
 
   async saveEvents(data: Event[]) {
     this.data.events = {
+      data,
+      updatedAt: new Date().toISOString()
+    }
+    await this.save()
+  }
+
+  async getMaps() {
+    return this.data.mapsData
+  }
+
+  async saveMaps(data: GW2MapsResponse) {
+    this.data.mapsData = {
       data,
       updatedAt: new Date().toISOString()
     }

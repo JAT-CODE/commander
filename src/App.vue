@@ -3,31 +3,14 @@ import GW2Map from './components/GW2Map.vue'
 </script>
 
 <template>
-  <div class="container">
-    <div class="map-container">
-      <GW2Map />
-    </div>
-  </div>
+  <GW2Map />
 </template>
 
-<style scoped>
-.container {
-  width: 100vw;
-  height: 100vh;
+<style>
+html, body {
   margin: 0;
   padding: 0;
-  display: flex;
-  flex-direction: column;
-}
-
-.map-container {
-  flex: 1;
   width: 100%;
-  position: relative;
-}
-
-h1 {
-  padding: 1rem;
-  margin: 0;
+  height: 100%;
 }
 </style>

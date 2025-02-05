@@ -86,3 +86,24 @@ export interface Event {
     chat_link: string;
   }
   
+  export type MapType = 'Public' | 'Instance' | 'Tutorial' | 'Tournament' | 'PvP' | 'GvG' | 'Center' | 'Unknown'
+  
+  export interface GW2Map {
+    map_name: string
+    continent_rect: number[][]
+    type: MapType
+    min_level: number
+    max_level: number
+    default_floor: number
+    floors: number[]
+    region_id: number
+    region_name: string
+    continent_id: number
+    continent_name: string
+    map_rect: number[][]
+  }
+  
+  export interface GW2MapsResponse {
+    maps: Record<string, GW2Map>
+  }
+  
