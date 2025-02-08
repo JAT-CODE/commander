@@ -1,0 +1,24 @@
+{
+  "twoHourBlock": {
+    "0:15": "Jungle Worm",
+    "0:45": "Shadow Behemoth",
+    "1:15": "Svanir Shaman",
+    "1:45": "Fire Elemental"
+  },
+  "threeHourBlock": {
+    "0:00": "The Shatterer",
+    "0:30": "Modniir Ulgoth",
+    "1:00": "Golem Mark II",
+    "1:30": "Claw of Jormag",
+    "2:00": "Taidha Covington",
+    "2:30": "Megadestroyer"
+  },
+  "specialEvents": {
+    "Tequatl": ["0:00", "3:00", "7:00", "11:00", "16:00", "19:00"],
+    "EvolvedJungleWorm": ["1:00", "4:00", "8:00", "12:30", "14:00", "17:00", "20:00", "22:00"],
+    "KarkaQueen": ["2:00", "6:00", "10:30", "15:00", "18:00", "23:00"]
+  },
+
+
+  "duration": 30
+}
